@@ -38,11 +38,10 @@ fn main() {
     Because this code loops infinitely (loop { ... }), if you just wrote for stream in streams, Rust's ownership system would think you are trying to permanently consume or lock the streams reference on the very first iteration of the outer loop.By writing &mut *streams, you explicitly tell the compiler: "I want to create a brand new, short-lived borrow of the data inside this vector for this specific run of the for loop, and then immediately release it so the outer loop can safely run again on the next turn."
     */
     fn looping_old_connections(mut stream: TcpStream) {
-        let buf_reader = BufReader::new(&stream);
-        println!("This is the buf Reader {buf_reader:?}");
         println!("Inside infinite loop");
+        
         loop {
-            let message  = read_message(&buf_reader);
+            let message  = read_message(&stream);
             write_message(message, &mut stream);
         }
     }
@@ -75,10 +74,11 @@ fn main() {
     // looping_old_connections();
    
 
-    fn read_message(val : &BufReader<TcpStream>) ->  String {
-        
+    fn read_message(val : &TcpStream) ->  String {
+        let buf_reader = BufReader::new(val);
+        println!("This is the buf Reader {buf_reader:?}");
         // there might be problem here 
-        let line = val.lines().next().unwrap().unwrap();
+        let line = buf_reader.lines().next().unwrap().unwrap();
         println!("This is the lines inside buf reader {line:?}");
         line
     }
