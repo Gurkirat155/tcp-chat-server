@@ -4,81 +4,33 @@ use std::thread;
 
 fn main() {
     
-
-    let mut streams: Vec<TcpStream> = vec![];
-
     let listner = TcpListener::bind("127.0.0.1:8080").unwrap();
 
     
     for stream in listner.incoming() {
-        // let mut stream  = stream.unwrap();
         let stream  = stream.unwrap();
         println!("NEW STREAM CONNECETED {stream:?}");
 
-        // let message  = read_message(&stream);
-        println!("Entered incoming()");
-        // streams.push(stream);
-
-        // println!("Message sent in the server to everyone");
-        // write_message(message, &mut stream);
-        
-        // let streamAddr = stream.read(stream);
-        // println!("New client connected {streamAddr:?}");
-        // let message = stream.read().unwrap();
-        // looping_old_connections(&mut streams);
-
         thread::spawn(move || {
-            println!("{:?}", stream.peer_addr());
+            println!("New thread spawned for the incoming peer addr {:?}", stream.peer_addr().unwrap());
             looping_old_connections(stream)
         });
     }
 
-    /*
-    Why &mut *streams(deref is neccarary in the loop) is necessary in this specific loop:
-    Because this code loops infinitely (loop { ... }), if you just wrote for stream in streams, Rust's ownership system would think you are trying to permanently consume or lock the streams reference on the very first iteration of the outer loop.By writing &mut *streams, you explicitly tell the compiler: "I want to create a brand new, short-lived borrow of the data inside this vector for this specific run of the for loop, and then immediately release it so the outer loop can safely run again on the next turn."
-    */
+
     fn looping_old_connections(mut stream: TcpStream) {
         println!("Inside infinite loop");
+        let mut buf_reader = BufReader::new(stream.try_clone().unwrap());
+        // println!("This is the buf Reader {buf_reader:?}");
         
         loop {
-            let message  = read_message(&stream);
+            let message  = read_message(&mut buf_reader);
             write_message(message, &mut stream);
         }
     }
-
-
-
-
-
-    // fn looping_old_connections(streams: &mut Vec<TcpStream>) {
-    //     println!("Inside infinite loop");
-    //     loop {
-    //         for stream in &mut *streams {
-    //             let message  = read_message(&stream);
-    //             write_message(message, stream);
-    //         }
-    //     }
-    // }
-
-
-    // let mut looping_old_connections = || {
-    //     println!("Inside infinite loop");
-    //     loop {
-    //         for stream in &mut *streams {
-    //             let message  = read_message(&stream);
-    //             write_message(message, stream);
-    //         }
-    //     }
-    // };
-
-    // looping_old_connections();
    
-
-    fn read_message(val : &TcpStream) ->  String {
-        let buf_reader = BufReader::new(val);
-        println!("This is the buf Reader {buf_reader:?}");
-        // there might be problem here 
-        let line = buf_reader.lines().next().unwrap().unwrap();
+    fn read_message(val : &mut BufReader<TcpStream>) ->  String {
+        let line = val.lines().next().unwrap().unwrap();
         println!("This is the lines inside buf reader {line:?}");
         line
     }
@@ -138,3 +90,43 @@ fn main() {
 //     //     stream.write_all(message.as_bytes()).unwrap();
 //     // }
 // }
+
+
+    // fn read_message(val : &TcpStream) ->  String {
+    //     let buf_reader = BufReader::new(val);
+    //     println!("This is the buf Reader {buf_reader:?}");
+    //     // there might be problem here 
+    //     let line = buf_reader.lines().next().unwrap().unwrap();
+    //     println!("This is the lines inside buf reader {line:?}");
+    //     line
+    // }
+
+
+
+
+    /*
+    Why &mut *streams(deref is neccarary in the loop) is necessary in this specific loop:
+    Because this code loops infinitely (loop { ... }), if you just wrote for stream in streams, Rust's ownership system would think you are trying to permanently consume or lock the streams reference on the very first iteration of the outer loop.By writing &mut *streams, you explicitly tell the compiler: "I want to create a brand new, short-lived borrow of the data inside this vector for this specific run of the for loop, and then immediately release it so the outer loop can safely run again on the next turn."
+    */
+    // fn looping_old_connections(streams: &mut Vec<TcpStream>) {
+    //     println!("Inside infinite loop");
+    //     loop {
+    //         for stream in &mut *streams {
+    //             let message  = read_message(&stream);
+    //             write_message(message, stream);
+    //         }
+    //     }
+    // }
+
+
+    // let mut looping_old_connections = || {
+    //     println!("Inside infinite loop");
+    //     loop {
+    //         for stream in &mut *streams {
+    //             let message  = read_message(&stream);
+    //             write_message(message, stream);
+    //         }
+    //     }
+    // };
+
+    // looping_old_connections();
