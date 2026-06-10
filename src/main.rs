@@ -1,43 +1,60 @@
-use std::{io::{BufReader, BufRead, Read,Write}, net::{TcpListener, TcpStream}};
+use std::{collections::HashMap, io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream, SocketAddr}, sync::{Arc, Mutex}};
 use std::thread;
 
 
 fn main() {
     
-    let listner = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:8080").expect("Not connected to the listener");
+    // let streams: Arc<Mutex<Vec<TcpStream>>> = Arc::new(Mutex::new(vec![]));
+    // let mut streams: Arc<Mutex<Vec<Arc<TcpStream>>>> = Arc::new(Mutex::new(vec![]));
+    let mut streams = Arc::new(Mutex::new(vec![]));
 
+    for stream in listener.incoming() {
+        // Now i have to store the upcoming streams in global state as well as read the messages and spin a a new thread for each new upcoming connections
+
+        // TODO DONE -- (PROVIDED OWNERSHIP TO BOTH) i have to decide whther i should give the ownership to global state variable or each new thread has the ownership of the stream 
+        let stream =  Arc::new(stream.unwrap());
+        // REASON OF CLONING We are cloning the the stream because we are pushing the stream into global state and then when we are spawning new thread that would also need access to the stream for reading messages, so that's why we cloned the stream
+        let stream_clone = Arc::clone(&stream);
+        // REASON OF CLONING we are cloning the streams first we want to push the streams in main whenever new listener comes and second we want to pass it to broadcast message, and since the global state is ARC we could have multiple owners of the same data and anyone could modify iy by cloning it.
+        let streams_clone = Arc::clone(&streams);
     
-    for stream in listner.incoming() {
-        let stream  = stream.unwrap();
-        println!("NEW STREAM CONNECETED {stream:?}");
+        streams.lock().unwrap().push(stream);
+        let length_of_streams = streams.lock().unwrap().len();
+
+        println!("Number of conections {length_of_streams:?} ");
 
         thread::spawn(move || {
-            println!("New thread spawned for the incoming peer addr {:?}", stream.peer_addr().unwrap());
-            looping_old_connections(stream)
+            println!("NEW THREAD SPAWNED");
+            read_incoming_stream_messsages(stream_clone, streams_clone);
         });
     }
 
+    fn read_incoming_stream_messsages(stream: Arc<TcpStream>, streams: Arc<Mutex<Vec<Arc<TcpStream>>>>) {
+        println!("Reading messages of new connetions");
 
-    fn looping_old_connections(mut stream: TcpStream) {
-        println!("Inside infinite loop");
-        let mut buf_reader = BufReader::new(stream.try_clone().unwrap());
-        // println!("This is the buf Reader {buf_reader:?}");
-        
-        loop {
-            let message  = read_message(&mut buf_reader);
-            write_message(message, &mut stream);
+        let peer_addr = stream.peer_addr().unwrap();
+        let buf_reader = BufReader::new(&*stream);
+        let mut lines_iteration = buf_reader.lines();
+
+        while let Some(Ok(message)) = lines_iteration.next() {
+            println!("This is the message {message:?}");
+            
+            broadcast_message(message, peer_addr, Arc::clone(&streams));
         }
     }
-   
-    fn read_message(val : &mut BufReader<TcpStream>) ->  String {
-        let line = val.lines().next().unwrap().unwrap();
-        println!("This is the lines inside buf reader {line:?}");
-        line
-    }
 
-    fn write_message(message: String, stream: &mut TcpStream ) {
-        println!("Entered inside the write function");
-        stream.write_all(message.as_bytes()).unwrap();
+
+    fn broadcast_message(message: String, peer_addr: SocketAddr, streams: Arc<Mutex<Vec<Arc<TcpStream>>>>) {
+        println!("Broadcasting message");
+        let streams_locked = streams.lock().expect("Streams N/A in broadcast_message");
+        for  stream in  streams_locked.iter(){
+
+            if peer_addr != stream.peer_addr().expect("Don't have the peer addr") {
+                let mut raw_stream = &**stream;
+                raw_stream.write_all(message.as_bytes()).unwrap();
+            }
+        }
     }
 }
 
