@@ -7,7 +7,7 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").expect("Not connected to the listener");
     // let streams: Arc<Mutex<Vec<TcpStream>>> = Arc::new(Mutex::new(vec![]));
     // let mut streams: Arc<Mutex<Vec<Arc<TcpStream>>>> = Arc::new(Mutex::new(vec![]));
-    let mut streams = Arc::new(Mutex::new(vec![]));
+    let streams = Arc::new(Mutex::new(vec![]));
 
     for stream in listener.incoming() {
         // Now i have to store the upcoming streams in global state as well as read the messages and spin a a new thread for each new upcoming connections
@@ -36,14 +36,32 @@ fn main() {
         let peer_addr = stream.peer_addr().unwrap();
         let buf_reader = BufReader::new(&*stream);
         let mut lines_iteration = buf_reader.lines();
-
-        while let Some(Ok(message)) = lines_iteration.next() {
-            println!("This is the message {message:?}");
-            
-            broadcast_message(message, peer_addr, Arc::clone(&streams));
+        loop {
+            match lines_iteration.next() {
+                Some(Ok(message)) => {
+                    println!("This is the message {message:?}");
+                    broadcast_message(message, peer_addr, Arc::clone(&streams));
+                },
+                None => {
+                    println!("Peer DISCONNECTED {peer_addr:?}");
+                    let mut active_stream = streams.lock().unwrap();
+                    active_stream.retain(|stream| {
+                        stream.peer_addr().unwrap() != peer_addr
+                    });
+                    break;
+                },
+                Some(Err(e)) => {
+                    println!("Got an error from a peer {peer_addr:?} Error: {e:?}");
+                    break;
+                }
+            }
         }
-    }
 
+        // while let Some(Ok(message)) = lines_iteration.next() {
+        //     println!("This is the message {message:?}");
+        //     broadcast_message(message, peer_addr, Arc::clone(&streams));
+        // }
+    }
 
     fn broadcast_message(message: String, peer_addr: SocketAddr, streams: Arc<Mutex<Vec<Arc<TcpStream>>>>) {
         println!("Broadcasting message");
