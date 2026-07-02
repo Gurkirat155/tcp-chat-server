@@ -41,7 +41,20 @@ fn main() {
             // REASON I have cloned the name cause we are passing the value of string in global state variable at "streams_new_type" but we also need the name for reading messages so that's why i cloned it below
             let name_1 = name.clone();
             println!("This is the name {name:?} ");
-            streamS_clone.lock().unwrap().insert(String::from(name), stream_clone_1);
+           { 
+                let mut streams_locked = streamS_clone.lock().expect("Streams Not Found in Main Thread");
+                match streams_locked.get(&name) {
+                    Some(_val) => {
+                        println!("Username already exist {name:?}");
+                        let error_message_to_sender_when_username_same = &format!("Username {name} already exists, please select a different Username");
+                        // let stream_of_sender_locked = stream_clone.lock().expect("Stream not found for the sender");
+                        (&*stream_clone).write_all(error_message_to_sender_when_username_same.as_bytes()).expect("Message by the server not delevired to the sender");
+                    },
+                    None => {
+                        streams_locked.insert(String::from(name), stream_clone_1);
+                    }
+                }
+            }
 
             let total_connections = streamS_clone.lock().unwrap().len();
             println!("Total NUMBER OF CONNECTIONS: {total_connections}");
@@ -192,12 +205,12 @@ fn main() {
                             message_user(&sender_username, receiver_username, message_by_sender, streams, false);
                         },
                         (None, _) => {
-                            let message_to_sender_when_user_not_found = "Username empty, please enter a Username";
-                            message_user(&sender_username, &sender_username, message_to_sender_when_user_not_found, streams, true);
+                            let error_message_to_sender_when_user_not_found = "Username empty, please enter a Username";
+                            message_user(&sender_username, &sender_username, error_message_to_sender_when_user_not_found, streams, true);
                         },
                         (_,None) => {
-                            let message_to_sender_when_message_not_found = "Message empty, please enter a message";
-                            message_user(&sender_username, &sender_username, message_to_sender_when_message_not_found, streams, true);
+                            let error_message_to_sender_when_message_not_found = "Message empty, please enter a message";
+                            message_user(&sender_username, &sender_username, error_message_to_sender_when_message_not_found, streams, true);
                         }
                     }
 
@@ -231,14 +244,14 @@ fn main() {
                 },
                 _ => {
                     println!("WRONG CMD: TRY AGAIN");
-                    let message_to_sender_when_cmd_not_found = "Cmd not found, please enter the CMD correctly";
-                    message_user(&sender_username, &sender_username, message_to_sender_when_cmd_not_found, streams, true);
+                    let error_message_to_sender_when_cmd_not_found = "Cmd not found, please enter the CMD correctly";
+                    message_user(&sender_username, &sender_username, error_message_to_sender_when_cmd_not_found, streams, true);
                     ParseResult::Continue
                 }
             }
         }else{
-            let message_to_sender_when_cmd_not_found = "Cmd not found, please enter the CMD correctly";
-            message_user(&sender_username, &sender_username, message_to_sender_when_cmd_not_found, streams, true);
+            let error_message_to_sender_when_cmd_not_found = "Cmd not found, please enter the CMD correctly";
+            message_user(&sender_username, &sender_username, error_message_to_sender_when_cmd_not_found, streams, true);
             ParseResult::Continue
         }
         
