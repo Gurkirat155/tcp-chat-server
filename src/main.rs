@@ -58,7 +58,9 @@ fn main() {
                     println!("This is the message {message:?}");
                     // ASK AI -  See i am using clone for cloning the username is it efficient way to do it or can we do it more efficiently,?? FIRST SEE if deep copy is expensive or not cause we are making a new everytime a new message is broadcasted 
                     // ANSWER AI - The cost of cloning a short username like: "Alice" is negligible. So no worries we can clone the username
-                    broadcast_message(username.clone(), message, Arc::clone(&streams));
+                    // TODO - Here i have to add a function which actually checks whether user is sending a cmd or simple message so it could act accordingly
+                    parse_message(username.clone(), message, Arc::clone(&streams));
+                    // broadcast_message(username.clone(), message, Arc::clone(&streams));
                 },
                 None => {
                     // TODO (DONE) - here i have to implment that when a stream becomes inactive it should reflect globally so it doesn't write to that peeraddr in broadcast function
@@ -80,9 +82,9 @@ fn main() {
     // Here in the broadcast function add a if and else that if the string of user is not present don't broadcasrt the message
     fn broadcast_message(username: String , message: String, streams_with_username: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
         println!("Broadcasting message");
-        let streams_locked = streams_with_username.lock().expect("Streams N/A in broadcast_message");
+        let streams_locked = streams_with_username.lock().expect("Streams Not Found in broadcast_message");
         for  (key, value) in  streams_locked.iter(){
-            println!("This is the key viz username {key} ");
+            // println!("This is the key viz username {key} ");
             if key != &username {
                 
                 // println!("This is the stream {:?}", stream);
@@ -91,7 +93,7 @@ fn main() {
                 // ASK AI - see i am using clone is that an efficient way to do it or is there a better way to do it.
                 // ANSWER AI - The cost of cloning a short username like: "Alice" is negligible. So no worries we can clone the username.
                 // let framed_message = username.clone() + ": " + &message ;
-                let framed_message = format!("\r\n{}: {} \r\n", username, message);
+                let framed_message = format!("{}: {} \r\n", username, message);
 
                 // MEANING OF &**value -- value ──▶ &Arc<TcpStream> ──▶ Arc<TcpStream> ──▶ TcpStream ──▶ &TcpStream
                 (&**value).write_all(framed_message.as_bytes()).unwrap();
@@ -146,6 +148,95 @@ fn main() {
             }
         }
     }
+
+
+    /*
+        TODO
+        1. (DONE) - parse should first take message and check if it is cmd or not
+        2. If it is cmd than act and call that function accordingly 
+        3. If it is msg than simply broadcast that message -- REJECTED AS I HAVE TO MAKE A SEPRATE CMD FOR BROADCASTING ONLY
+        4. If a user selected for private chat server until and unless they type another cmd and select another person for messaging.
+
+        these are the cmds 
+        /msg (DONE)- what it will look like (/msg user message), so the sender is always connected to the same guy until and unless they type /list cmd and select a different user. so the in the parse message in /msg it will contain a function which will write message to a particular user only
+        /list (DONE) - list all thje users connected to the server  
+        /broadcast - broadcast mesage to all the users in the server
+        /help - list all the cmds with the description on what do they do 
+        /quit - quit the message or disconnect the user 
+    */
+    fn parse_message(sender_username: String, message: String, streams: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
+        if message.starts_with('/') {
+            // println!("This is the IF block CMDS ONLY");
+            let spliting_message: Vec<&str> = message.splitn(4, '/').collect();
+            println!("This is the message spilt {spliting_message:?}");
+
+            let cmd = spliting_message[1];
+            println!("THIS IS THE CMD {cmd:?}");
+            match cmd.trim_end() {
+                "msg" => {
+                    println!("USER CMD: msg");
+                    // TODO (DONE) - make a function that takes username of the sender , reciever and the message by the sender and also it should take all the streams 
+                    let receiver_username = spliting_message[2].trim_end();
+                    let message_by_sender = spliting_message[3].trim_end();
+                    message_user(sender_username, receiver_username, message_by_sender, streams);
+                },
+                "list" => {
+                    println!("USER CMD: list");
+                    // TODO (DONE) - it should take sender username, steams as argument and also this function would have the write capabilities means server will reply to the sender with all the usernames
+                    list_all_the_users(sender_username, streams);
+                },
+                "broadcast" => println!("USER CMD: broadcast"),
+                "help" => println!("USER CMD: help"),
+                "quit" => println!("USER CMD: quit"),
+                _ => println!("WRONG CMD: TRY AGAIN")
+            }
+        }else {
+            println!("This is the ELSE block Broadcasting message ONLY");
+            broadcast_message(sender_username.clone(), message, streams);
+        }       
+        
+    }
+
+    fn message_user(sender_username: String, receiver_username: &str, message: &str, streams: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
+
+        let streams_locked = streams.lock().expect("Streams Not Found in message_user");
+        for (username, stream) in streams_locked.iter() {
+            if &receiver_username == username {
+                let framed_message = format!("{} : {}\r\n", sender_username, message);
+                // ASK AI - is this correct way in this situation to convert string into &str or is there a idiomatic way for it.
+                let error_message = &format!("Message didn't go through sent by the user {sender_username} to the receiver {receiver_username}");
+                (&**stream).write_all(framed_message.as_bytes()).expect(error_message);
+            }
+        }
+    }
+
+    fn list_all_the_users(sender_username: String, streams: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
+ 
+        let streams_locked = streams.lock().expect("Streams Not Found in list_all_the_users");
+        // ASK AI - in this function could that also be implemented like server only gives the whole list which is easy but when user receies the list can he select by up and down arrow only or should the sender/user type the name of the receiver manually once the list has been shown by the server, surrently i am implementing the later version only, by sending the username of total receiver's username individually.
+        let mut usernames: Vec<&str>= Vec::new();
+        let sender_stream = match  streams_locked.get(&sender_username){
+            Some(stream) => stream,
+            _ => {
+                println!("Sender {} not found in the active users list.", sender_username);
+                return;
+            }
+        };
+
+        for username in streams_locked.keys() {
+            if username != &sender_username {
+                usernames.push(username);
+            }
+        }
+
+        for receiver_username in usernames.iter() {
+            let foramtted_username = format!("\r\n{receiver_username}");
+            let error_message = &format!("Message didn't go through sent by the SERVER to the SENDER {sender_username}");
+            (&**sender_stream).write_all(foramtted_username.as_bytes()).expect(error_message);
+        }
+    }
+
+
 }
 
 
