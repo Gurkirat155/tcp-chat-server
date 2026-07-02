@@ -185,9 +185,21 @@ fn main() {
                 "msg" => {
                     println!("USER CMD: msg");
                     // TODO (DONE) - make a function that takes username of the sender , reciever and the message by the sender and also it should take all the streams 
-                    let receiver_username = spliting_message[2].trim_end();
-                    let message_by_sender = spliting_message[3].trim_end();
-                    message_user(&sender_username, receiver_username, message_by_sender, streams, false);
+                    match (spliting_message.get(2) , spliting_message.get(3)) {
+                        (Some(receiver_raw), Some(message_raw)) => {
+                            let receiver_username = receiver_raw.trim_end();
+                            let message_by_sender = message_raw.trim_end();
+                            message_user(&sender_username, receiver_username, message_by_sender, streams, false);
+                        },
+                        (None, _) => {
+                            let message_to_sender_when_user_not_found = "Username empty, please enter a Username";
+                            message_user(&sender_username, &sender_username, message_to_sender_when_user_not_found, streams, true);
+                        },
+                        (_,None) => {
+                            let message_to_sender_when_message_not_found = "Message empty, please enter a message";
+                            message_user(&sender_username, &sender_username, message_to_sender_when_message_not_found, streams, true);
+                        }
+                    }
 
                     ParseResult::Continue
                 },
