@@ -80,7 +80,7 @@ fn main() {
 
     
     // Here in the broadcast function add a if and else that if the string of user is not present don't broadcasrt the message
-    fn broadcast_message(username: String , message: String, streams_with_username: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
+    fn broadcast_message(username: String , message: &str, streams_with_username: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
         println!("Broadcasting message");
         let streams_locked = streams_with_username.lock().expect("Streams Not Found in broadcast_message");
         for  (key, value) in  streams_locked.iter(){
@@ -185,15 +185,21 @@ fn main() {
                     // TODO (DONE) - it should take sender username, steams as argument and also this function would have the write capabilities means server will reply to the sender with all the usernames
                     list_all_the_users(sender_username, streams);
                 },
-                "broadcast" => println!("USER CMD: broadcast"),
-                "help" => println!("USER CMD: help"),
-                "quit" => println!("USER CMD: quit"),
+                "broadcast" => {
+                    println!("USER CMD: broadcast");
+                    let message_by_sender = spliting_message[2].trim_end();
+                    broadcast_message(sender_username, message_by_sender, streams);
+                },
+                "help" => {
+                    println!("USER CMD: help");
+                    cmds_description(sender_username, streams);
+                },
+                "quit" => {
+                    println!("USER CMD: quit");
+                },
                 _ => println!("WRONG CMD: TRY AGAIN")
             }
-        }else {
-            println!("This is the ELSE block Broadcasting message ONLY");
-            broadcast_message(sender_username.clone(), message, streams);
-        }       
+        }
         
     }
 
@@ -236,6 +242,25 @@ fn main() {
         }
     }
 
+    fn cmds_description(sender_username: String, streams: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) {
+
+        let cmds_string = "
+                            /msg - msg that particular user \r\n
+                            /list - list all the users connected to the server   \r\n
+                            /broadcast - broadcast message to all the users in the server \r\n
+                            /help - list all the cmds with the description on what do they do  \r\n
+                            /quit - quit the message or disconnect the user \r\n";
+
+        
+        let streams_locked = streams.lock().expect("Streams Not Found in cmds_description");
+        let Some(sender_stream) = streams_locked.get(&sender_username) else {
+            println!("Stream not found");
+            return;
+        };
+
+        let error_message = &format!("Message didn't go through sent by the SERVER to the SENDER {sender_username}");
+        (&**sender_stream).write_all(cmds_string.as_bytes()).expect(error_message);
+    }
 
 }
 
