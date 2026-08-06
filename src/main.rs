@@ -48,7 +48,7 @@ fn main() {
                         println!("Username already exist {name:?}");
                         let error_message_to_sender_when_username_same = &format!("Username {name} already exists, please select a different Username");
                         // let stream_of_sender_locked = stream_clone.lock().expect("Stream not found for the sender");
-                        (&*stream_clone).write_all(error_message_to_sender_when_username_same.as_bytes()).expect("Message by the server not delevired to the sender");
+                        (&*stream_clone_1).write_all(error_message_to_sender_when_username_same.as_bytes()).expect("Message by the server not delevired to the sender");
                     },
                     None => {
                         streams_locked.insert(String::from(name), stream_clone_1);
@@ -67,9 +67,12 @@ fn main() {
         println!("Reading messages of new connetions");
 
         let peer_addr = stream.peer_addr().unwrap();
+        // ASK AI DOUBT what does buf reader with stream ??
         let buf_reader = BufReader::new(&*stream);
+        // DOUBT what is lines method use for ??
         let mut lines_iteration = buf_reader.lines();
         loop {
+            // DOUBT what does next method do ??
             match lines_iteration.next() {
                 Some(Ok(message)) => {
                     println!("This is the message {message:?}");
@@ -88,9 +91,10 @@ fn main() {
                         }
                     }
                 },
+                // DOUBT why is none better than OK(0) and does it come under the same branch as None only
                 None => {
                     // TODO (DONE) - here i have to implment that when a stream becomes inactive it should reflect globally so it doesn't write to that peeraddr in broadcast function
-                    // ASK AI -- why is taking &username and not the only username 
+                     // ASK AI -- why is taking &username and not the only username 
                     streams.lock().unwrap().remove(&username).expect("Not able find the username");
                     println!("User {username} DISCONNECTED");
                     println!("Peer DISCONNECTED {peer_addr:?}");
@@ -111,15 +115,15 @@ fn main() {
         let streams_locked = streams_with_username.lock().expect("Streams Not Found in broadcast_message");
         let formatted_message = format!("{}: {} \r\n", sender_username, message);
         
-        for  (receiver_username, value) in  streams_locked.iter(){
+        for  (receiver_username, stream) in  streams_locked.iter(){
             // println!("This is the key viz sender_username {key} ");
             if receiver_username != sender_username {
                 // println!("This is the stream {:?}", stream);
                 // TODO (DONE)- Write messages to all the clients those who have active streams
                 // TODO (DONE) - write messages with who sent it 
                 let error_message = &format!("Failed to broadcast to {}", receiver_username);
-                // MEANING OF &**value -- value ──▶ &Arc<TcpStream> ──▶ Arc<TcpStream> ──▶ TcpStream ──▶ &TcpStream
-                (&**value).write_all(formatted_message.as_bytes()).expect(error_message);
+                // MEANING OF &**stream -- stream ──▶ &Arc<TcpStream> ──▶ Arc<TcpStream> ──▶ TcpStream ──▶ &TcpStream
+                (&**stream).write_all(formatted_message.as_bytes()).expect(error_message);
                 /*
                     &**value -- value ──▶ &Arc<TcpStream> ──▶ Arc<TcpStream> ──▶ TcpStream ──▶ &TcpStream
                     Now here's the important part
@@ -190,6 +194,7 @@ fn main() {
     */
     fn parse_message(sender_username: String, message: String, streams: Arc<Mutex<HashMap<String, Arc<TcpStream>>>>) -> ParseResult {
         if message.starts_with('/') {
+            // DOUBT ASK AI why did i use 4 instead of three for splitting the message
             let spliting_message: Vec<&str> = message.splitn(4, '/').collect();
             // println!("This is the message spilt {spliting_message:?}");
 
@@ -470,3 +475,164 @@ fn main() {
     //         }
     //     }
     // }
+
+
+
+
+
+// // EXERCISE 1
+// use tokio::time::{sleep, Duration};
+
+// #[tokio::main]
+// async fn main() {
+//     println!("Main started");
+
+//     tokio::spawn(async {
+//         // TODO:
+//         // Print "Task started"
+//         println!("TASK STARTED");
+//         // Wait for 2 seconds
+//         // println!("")
+//         sleep(Duration::from_secs(2)).await();
+//         // Print "Task finished"
+//         println!("TASK FINSISHED");
+//     });
+
+//     println!("Main finished");
+// }
+// // First Main finished will be printed than "Task finsihed" will be printed after 2 seconds
+// // Task finsished will be printed 
+
+// // EXERCISE - 2
+
+
+// use tokio::time::{sleep, Duration};
+
+// #[tokio::main]
+//     async fn main() {
+//         println!("Main started");
+
+//         let handle = tokio::spawn(async {
+//             println!("Task started");
+
+//             sleep(Duration::from_secs(2)).await;
+
+//             println!("Task finished");
+//         });
+
+//         // TODO
+//         handle.await();
+
+//         println!("Main finished");
+//     }
+
+// // EXERCISE - 3
+
+// #[tokio::main]
+
+
+// async fn main() {
+//     tokio::spawn(async {
+//         // TASK A 
+
+//         sleep(Duration::from_secs(2)).await();
+//     });
+
+//     tokio::spawn(async {
+//         // TASK B
+//         sleep(Duration::from_secs(1)).await();
+//     });
+
+//     tokio::spawn(async {
+//         // TASK C
+//         sleep(Duration::from_secs(3)).await();
+//     });
+// }
+// // They weren't finshsed in order they were spawned cause i added a sleep so the task is paused for particular number of seconds that it tell the worker thread i am ready to execute
+
+// // EXERCISE 4 
+
+// use std::sync::{Arc, Mutex};
+
+// #[tokio::main]
+// async fn main() {
+//     let counter = Arc::new(Mutex::new(0));
+
+//     let mut handles = vec![];
+
+//     for _ in 0..10 {
+//         let counter = Arc::clone(&counter);
+
+//         let handle = tokio::spawn(async move {
+//             // TODO
+
+//             // I know the below two lines should be {} local scope i guess but i don't know why, please explain me the reason or is my code correct that also explain
+
+//             // Lock counter
+//             let mut count  = counter.lock().unwrap();
+
+//             // Increment it
+//             *count += 1;
+//             println!("This is the value of counter  {:?}", count);
+//         });
+
+//         handle.await;
+//         handles.push(handle);
+//     }
+
+//     // Wait for every task
+//     println!("{}", *counter.lock().unwrap());
+// }
+
+
+// // EXERCISE 5 
+
+// use std::sync::{Arc, Mutex};
+
+// #[tokio::main]
+// async fn main() {
+//     let counter = Arc::new(0);
+
+//     let mut handles = vec![];
+
+//     for _ in 0..10 {
+//         let counter = Arc::clone(&counter);
+
+//         let handle = tokio::spawn(async move {
+//             // TODO
+
+//             // Lock counter
+//             // let count  = counter.lock().unwrap();
+
+//             // Increment it
+//             *counter += 1;
+//             println!("This is the value of counter  {:?}", *counter);
+//         });
+
+//         handles.push(handle);
+//     }
+
+//     // Wait for every task
+//     handle.await();
+//     println!("{}", *counter.lock().unwrap());
+// }
+
+
+// // EXERCISE  - 6 
+
+// // TASK A -> TASK C -> TASK B -> TASK D
+
+
+
+
+
+
+
+// Question 1
+// Cause the client disconnected, so that's why it returned 0, and at that time we need to break the loop of reading for that particular client
+
+// question 2
+// The read task is paused if no one is sending messages but when someone sends "Hello"  OS tells the tokio task data is received, so now you can read this is what happens in those 30 seconds 
+
+// Question 3 
+// When we write sleep in tokio task it only let's that particualr task sleep but the thread is still working on other tasks but when we write the thread sleep the whole thread is sleeping and no task can be done that interval., and it's bad when the whole thread sleeps cause that way all the tasks on that thread could also not be done but when a task is at sleep it doesn't block th thread 
